@@ -1,0 +1,20 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "simply-helping-stats-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/simplyHelpingStats/SimplyHelpingStatsWebPart.js",
+          "manifest": "./src/webparts/simplyHelpingStats/SimplyHelpingStatsWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {
+    "vue": "./node_modules/vue/dist/vue.min.js"
+  },
+  "localizedResources": {
+    "SimplyHelpingStatsWebPartStrings": "lib/webparts/simplyHelpingStats/loc/{locale}.js"
+  }
+}
