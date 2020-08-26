@@ -14,6 +14,9 @@ export default class SimplyHelpingStatsWebPart extends BaseClientSideWebPart<
   ISimplyHelpingStatsWebPartProps
 > {
   public render(): void {
+
+    let site = this.context.pageContext.web;
+
     const id: string = `wp-${this.instanceId}`;
     this.domElement.innerHTML = `<div id="${id}"></div>`;
 
@@ -23,7 +26,8 @@ export default class SimplyHelpingStatsWebPart extends BaseClientSideWebPart<
         h(SimplyHelpingStatsComponent, {
           props: {
             msg: "This message is coming from TS file",
-            description: this.properties.description
+            description: this.properties.description,
+            site: site
           }
         })
     });

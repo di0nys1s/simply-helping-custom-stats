@@ -14,40 +14,50 @@
         <p>Non-use last 30 days</p>
       </div>
       <div class="box box-4">
-        <h1>1.5<span id="gb-used">Gb used</span></h1>
+        <div class="storage-info-container">
+          <h1>1.5</h1>
+          <span id="gb-used">Gb used</span>
+        </div>
         <p>Franchise storage utilised</p>
       </div>
     </div>
 
     <div class="table-responsive stats-table">
-      <table class="table table-hover table-bordered">
+      <table
+        id="sites-table"
+        class="ui celled table display"
+        style="width: 100%"
+      >
         <thead>
           <tr>
-            <th scope="col">Franchise</th>
-            <th scope="col">Status</th>
-            <th scope="col">Storage Utilised</th>
+            <th>Franchise</th>
+            <th>Status</th>
+            <th>Storage Utilised</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td class="table-warning"><a href="#">Malley</a></td>
-            <td class="table-warning">Needs attention, inactive last 45 days</td>
-            <td class="table-warning">0.2 Gb</td>
+            <td><a href="#">Malley</a></td>
+            <td>
+              Needs attention, inactive last 45 days
+            </td>
+            <td>0.2 Gb</td>
           </tr>
           <tr>
-            <td class="table-success"><a href="#">Bayswater</a></td>
-            <td class="table-success">OK - using Franchise site</td>
-            <td class="table-success">0.4 Gb</td>
+            <td><a href="#">Bayswater</a></td>
+            <td>OK - using Franchise site</td>
+            <td>0.4 Gb</td>
           </tr>
           <tr>
-            <td class="table-danger"><a href="#">Brunswick</a></td>
-            <td class="table-danger">Urgent - No activity at risk</td>
-            <td class="table-danger">0.2 Gb</td>
+            <td><a href="#">Brunswick</a></td>
+            <td>Urgent - No activity at risk</td>
+            <td>0.2 Gb</td>
           </tr>
         </tbody>
       </table>
     </div>
 
+    <!--
     <h1>Hello {{ fullName }}</h1>
     <h3>{{ welcome }}</h3>
     <p>{{ msg }}</p>
@@ -55,45 +65,22 @@
     <h5>{{ counter }}</h5>
     <button class="increment" @click="incrementCounter()">Increment</button>
     <button @click="decrementCounter()">Decrement</button>
+    -->
   </div>
 </template>
 
 <script lang="ts">
 import Vue from "vue";
-import SimplyHelpingStatsWebPart from "../SimplyHelpingStatsWebPart";
-
-const addStyleSheet = function(fileURL) {
-  var file = document.createElement("link");
-  file.rel = "stylesheet";
-  file.type = "text/css";
-  file.href = fileURL;
-  document.head.appendChild(file);
-};
-
-const addScript = function(fileURL, defer = false) {
-  var tag = document.createElement("script");
-  tag.src = fileURL;
-  if (defer) {
-    tag.setAttribute("defer", "");
-  }
-  document.head.appendChild(tag);
-};
-
-addStyleSheet(
-  "//stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
-);
-addScript("//cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js");
-
-import jQuery from "jquery";
-let $ = jQuery;
-
-$("p").css("color", "red");
+import $ from "jquery";
+import "datatables.net";
+import "datatables.net-se";
 
 export default Vue.extend({
   name: "Hello",
   props: {
     msg: String,
-    description: String
+    description: String,
+    site: String
   },
   data() {
     return {
@@ -103,8 +90,36 @@ export default Vue.extend({
       lastName: "Seyhan"
     };
   },
+  mounted() {
+    console.log("mounted");
+
+    $(".increment").click(function() {
+      console.log("Increment");
+    });
+    // Initialize the datatable - any is for preventing 'Property does not exist' error
+    // This is the solution reference - https://stackoverflow.com/questions/24984014/how-can-i-stop-property-does-not-exist-on-type-jquery-syntax-errors-when-using
+    ($("#sites-table") as any).DataTable();
+  },
+  created() {
+    console.log("created");
+
+    var styles = [
+      "https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css",
+      "https://cdn.datatables.net/1.10.21/css/dataTables.semanticui.min.css"
+    ];
+    styles.forEach(style => {
+      let tag = document.createElement("link");
+      tag.rel = "stylesheet";
+      tag.type = "text/css";
+      tag.href = style;
+      document.head.appendChild(tag);
+
+      tag.setAttribute("src", style);
+      document.head.appendChild(tag);
+    });
+  },
   methods: {
-    incrementCounter() {
+    incrementCounter: function() {
       this.counter++;
     },
     decrementCounter() {
@@ -173,7 +188,7 @@ export default class SimplyHelpingStats extends Vue {
   box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2), 0 25px 50px 0 rgba(0, 0, 0, 0.1);
 }
 
-@media only screen and (max-width: 500px) {
+@media only screen and (max-width: 700px) {
   .box-container {
     grid-template-areas:
       "box-1"
@@ -181,14 +196,27 @@ export default class SimplyHelpingStats extends Vue {
       "box-3"
       "box-4";
   }
+}
 
+@media only screen and (max-width: 350px) and (min-width: 100px) {
   .box {
-    width: 150px;
-    height: auto;
+    width: 130px;
   }
 }
 
-@media only screen and (min-width: 501px) {
+@media only screen and (max-width: 500px) and (min-width: 351px) {
+  .box {
+    width: 200px;
+  }
+}
+
+@media only screen and (min-width: 501px) and (max-width: 700px) {
+  .box {
+    width: 300px;
+  }
+}
+
+@media only screen and (min-width: 701px) {
   .box-container {
     column-gap: 20px;
     grid-template-areas:
@@ -198,7 +226,6 @@ export default class SimplyHelpingStats extends Vue {
 
   .box {
     width: 250px;
-    height: auto;
   }
 }
 
@@ -214,6 +241,7 @@ export default class SimplyHelpingStats extends Vue {
   background-color: #eee;
   color: black;
   text-align: center;
+  height: auto;
 }
 
 .box h1 {
@@ -241,12 +269,19 @@ export default class SimplyHelpingStats extends Vue {
   grid-area: box-4;
 }
 
+.storage-info-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 #gb-used {
   font-size: 10px;
+  margin-top: 35px;
 }
 
 .stats-table {
-  margin-top: 20px;
+  margin: 20px 0 20px 15px;
 }
 
 .stats-table a {
