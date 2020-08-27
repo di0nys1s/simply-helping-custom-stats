@@ -1,5 +1,6 @@
 <template>
   <div class="container">
+    <h1>Hello {{ userName }}</h1>
     <div class="box-container">
       <div class="box box-1">
         <h1>10</h1>
@@ -30,12 +31,22 @@
       >
         <thead>
           <tr>
-            <th>Franchise</th>
-            <th>Status</th>
-            <th>Storage Utilised</th>
+            <th v-for="(header, index) in headers" :key="index">
+              {{ header }}
+            </th>
           </tr>
         </thead>
         <tbody>
+          <tr v-for="item in configList" :key="item.id">
+            <td>
+              <a :href="item.URL">{{ item.Title }}</a>
+            </td>
+            <td>
+              Needs attention, inactive last 45 days
+            </td>
+            <td>0.2 Gb</td>
+          </tr>
+          <!--
           <tr>
             <td><a href="#">Malley</a></td>
             <td>
@@ -53,6 +64,7 @@
             <td>Urgent - No activity at risk</td>
             <td>0.2 Gb</td>
           </tr>
+          -->
         </tbody>
       </table>
     </div>
@@ -72,36 +84,79 @@
 <script lang="ts">
 import Vue from "vue";
 import $ from "jquery";
+import axios from "axios";
 import "datatables.net";
 import "datatables.net-se";
+import { sp } from "@pnp/sp";
+import { Web } from "@pnp/sp/webs";
+import "@pnp/sp/lists";
+import "@pnp/sp/items";
 
 export default Vue.extend({
   name: "Hello",
   props: {
     msg: String,
     description: String,
-    site: String
+    userName: String,
+    rootURL: String
   },
   data() {
     return {
       welcome: "Welcome to Simply Helping Site Stats",
       counter: 0,
       firstName: "Burak",
-      lastName: "Seyhan"
+      lastName: "Seyhan",
+      configList: [],
+      headers: ["Franchise", "Status", "Storage Utilised"]
     };
   },
-  mounted() {
-    console.log("mounted");
+  methods: {
+    incrementCounter: function() {
+      this.counter++;
+    },
+    decrementCounter() {
+      this.counter--;
+    },
+    getTitle: async function() {
+      const web = Web(
+        `${this.rootURL}/sites/product-demos/franchise-hq-demo`
+      );
+      const configList = await web.lists
+        .getByTitle("Config - Franchise Stats")
+        .items.get();
 
-    $(".increment").click(function() {
-      console.log("Increment");
+      console.log("List :>> ", configList);
+      this.configList = [...configList];
+    }
+  },
+  mounted() {
+    console.log("mounted...");
+
+    this.getTitle();
+
+    /*
+    const Url =
+      `${this.rootURL}/_api/web/GetFolderByServerRelativeUrl('/Shared%20Documents')`;
+
+    $.get(Url, function(data, status) {
+      console.log("data :>> ", data);
     });
+
+    axios({
+      method: "get",
+      url: Url,
+      responseType: "stream"
+    }).then(function(response) {
+      console.log("response :>> ", response);
+    });
+    */
+
     // Initialize the datatable - any is for preventing 'Property does not exist' error
     // This is the solution reference - https://stackoverflow.com/questions/24984014/how-can-i-stop-property-does-not-exist-on-type-jquery-syntax-errors-when-using
     ($("#sites-table") as any).DataTable();
   },
   created() {
-    console.log("created");
+    console.log("created...");
 
     var styles = [
       "https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css",
@@ -117,14 +172,6 @@ export default Vue.extend({
       tag.setAttribute("src", style);
       document.head.appendChild(tag);
     });
-  },
-  methods: {
-    incrementCounter: function() {
-      this.counter++;
-    },
-    decrementCounter() {
-      this.counter--;
-    }
   },
   computed: {
     fullName: {
@@ -186,6 +233,7 @@ export default class SimplyHelpingStats extends Vue {
   margin: 0px auto;
   padding: 10px 20px;
   box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2), 0 25px 50px 0 rgba(0, 0, 0, 0.1);
+  text-align: center;
 }
 
 @media only screen and (max-width: 700px) {

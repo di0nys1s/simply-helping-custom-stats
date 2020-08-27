@@ -19,6 +19,8 @@
     "@microsoft/sp-office-ui-fabric-core": "1.11.0",
     "@microsoft/sp-property-pane": "1.11.0",
     "@microsoft/sp-webpart-base": "1.11.0",
+    "@pnp/sp": "^2.0.8",
+    "axios": "^0.20.0",
     "datatables.net": "^1.10.21",
     "datatables.net-se": "^1.10.21",
     "vue": "^2.6.11",
