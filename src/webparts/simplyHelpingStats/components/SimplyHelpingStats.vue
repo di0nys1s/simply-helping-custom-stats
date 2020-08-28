@@ -1,22 +1,23 @@
 <template>
   <div class="container">
-    <h1>Hello {{ userName }}</h1>
+    <!--<h1>Hello {{ userName }}</h1>-->
+    <h1>{{ header }}</h1>
     <div class="box-container">
       <div class="box box-1">
-        <h1>10</h1>
+        <h1>{{ numberOfActiveFranchiseSites }}</h1>
         <p>Active Franchise sites</p>
       </div>
       <div class="box box-2">
-        <h1>3</h1>
+        <h1>{{ numberOfInactiveFranchiseSites }}</h1>
         <p>Inactive Franchise Sites</p>
       </div>
       <div class="box box-3">
-        <h1>1</h1>
-        <p>Non-use last 30 days</p>
+        <h1>{{ numberOfNonUsedLast30DaysFranchiseSites }}</h1>
+        <p>Non-use last {{ minDay }} days</p>
       </div>
       <div class="box box-4">
         <div class="storage-info-container">
-          <h1>1.5</h1>
+          <h1>{{ totalGbUsed }}</h1>
           <span id="gb-used">Gb used</span>
         </div>
         <p>Franchise storage utilised</p>
@@ -37,47 +38,26 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in configList" :key="item.id">
+          <!--
+          <tr v-for="item in representedSiteList" :key="item.id">
             <td>
               <a :href="item.URL">{{ item.Title }}</a>
             </td>
-            <td>
-              Needs attention, inactive last 45 days
+            <td v-if="item.dateDiff <= minDay">
+              OK - using Franchise site
             </td>
-            <td>0.2 Gb</td>
-          </tr>
-          <!--
-          <tr>
-            <td><a href="#">Malley</a></td>
-            <td>
-              Needs attention, inactive last 45 days
+            <td v-else-if="item.dateDiff >= maxDay">
+              Urgent - No activity at risk
             </td>
-            <td>0.2 Gb</td>
-          </tr>
-          <tr>
-            <td><a href="#">Bayswater</a></td>
-            <td>OK - using Franchise site</td>
-            <td>0.4 Gb</td>
-          </tr>
-          <tr>
-            <td><a href="#">Brunswick</a></td>
-            <td>Urgent - No activity at risk</td>
-            <td>0.2 Gb</td>
+            <td v-else-if="item.dateDiff > minDay && item.dateDiff < maxDay">
+              Needs attention, inactive last {{ item.dateDiff }} days
+            </td>
+            <td>{{ item.storageUsed }} Gb</td>
           </tr>
           -->
         </tbody>
       </table>
     </div>
-
-    <!--
-    <h1>Hello {{ fullName }}</h1>
-    <h3>{{ welcome }}</h3>
-    <p>{{ msg }}</p>
-    <p>{{ description }}</p>
-    <h5>{{ counter }}</h5>
-    <button class="increment" @click="incrementCounter()">Increment</button>
-    <button @click="decrementCounter()">Decrement</button>
-    -->
   </div>
 </template>
 
@@ -85,6 +65,7 @@
 import Vue from "vue";
 import $ from "jquery";
 import axios from "axios";
+import moment from "moment-timezone";
 import "datatables.net";
 import "datatables.net-se";
 import { sp } from "@pnp/sp";
@@ -93,12 +74,11 @@ import "@pnp/sp/lists";
 import "@pnp/sp/items";
 
 export default Vue.extend({
-  name: "Hello",
+  name: "Franchise Site Activity Report",
   props: {
-    msg: String,
-    description: String,
     userName: String,
-    rootURL: String
+    rootURL: String,
+    header: String
   },
   data() {
     return {
@@ -107,53 +87,159 @@ export default Vue.extend({
       firstName: "Burak",
       lastName: "Seyhan",
       configList: [],
-      headers: ["Franchise", "Status", "Storage Utilised"]
+      representedSiteList: [],
+      documentItemsList: [],
+      headers: ["Franchise", "Status", "Storage Utilised"],
+      numberOfActiveFranchiseSites: 0,
+      numberOfInactiveFranchiseSites: 0,
+      numberOfNonUsedLast30DaysFranchiseSites: 0,
+      minDay: 2,
+      maxDay: 4,
+      totalGbUsed: 0,
+      dataTable: null
     };
   },
   methods: {
-    incrementCounter: function() {
-      this.counter++;
+    formattedToday: function() {
+      let today = new Date().toUTCString();
+      let formattedToday = moment(today);
+      return formattedToday;
     },
-    decrementCounter() {
-      this.counter--;
-    },
-    getTitle: async function() {
-      const web = Web(
-        `${this.rootURL}/sites/product-demos/franchise-hq-demo`
+    calculateDateDifference: function(modifiedDate) {
+      let franchiseSiteUpdatedDate = moment(modifiedDate);
+      let dateDifference = this.formattedToday().diff(
+        franchiseSiteUpdatedDate,
+        "days"
       );
+      return dateDifference;
+    },
+
+    calculateNumberOfFranchiseSites: function(siteList, siteStatus) {
+      const minDay = this.minDay;
+      const maxDay = this.maxDay;
+
+      let franchiseSites = [...siteList].filter(a => {
+        let dateDifference = this.calculateDateDifference(a.Modified);
+        if (siteStatus === "Active") return dateDifference <= minDay;
+        if (siteStatus === "Inactive") return dateDifference >= maxDay;
+        if (siteStatus === "Non-used")
+          return dateDifference > minDay && dateDifference < maxDay;
+      });
+      let numberFranchiseSites = franchiseSites.length;
+      return numberFranchiseSites;
+    },
+    getItems: async function() {
+      const web = Web(`${this.rootURL}/sites/product-demos/franchise-hq-demo`);
       const configList = await web.lists
         .getByTitle("Config - Franchise Stats")
         .items.get();
 
       console.log("List :>> ", configList);
       this.configList = [...configList];
+
+      let siteList = {
+        Title: "",
+        URL: "",
+        dateDiff: "",
+        storageUsed: 0
+      };
+      let representedSiteList = [];
+
+      // Set necessary table values to a new representedSiteList array
+      [...configList].map(c => {
+        siteList.Title = c.Title;
+        siteList.URL = c.URL;
+        siteList.dateDiff = this.calculateDateDifference(c.Modified);
+        console.log(
+          "this.calculateDateDifference(c.Modified):>> ",
+          this.calculateDateDifference(c.Modified)
+        );
+        representedSiteList.push({ ...siteList });
+      });
+      console.log("this.siteList :>> ", representedSiteList);
+
+      // This is for vue table - not used
+      this.representedSiteList = representedSiteList;
+
+      // Set number of active Franchise Sites
+      this.numberOfActiveFranchiseSites = this.calculateNumberOfFranchiseSites(
+        configList,
+        "Active"
+      );
+      // Set number of inactive Franchise Sites
+      this.numberOfInactiveFranchiseSites = this.calculateNumberOfFranchiseSites(
+        configList,
+        "Inactive"
+      );
+      // Set number of non-used Last 30 days Franchise Sites
+      this.numberOfNonUsedLast30DaysFranchiseSites = this.calculateNumberOfFranchiseSites(
+        configList,
+        "Non-used"
+      );
+
+      // Initialize the datatable - any is for preventing 'Property does not exist' error
+      // This is the solution reference - https://stackoverflow.com/questions/24984014/how-can-i-stop-property-does-not-exist-on-type-jquery-syntax-errors-when-using
+      this.dataTable = ($("#sites-table") as any).DataTable();
+      // Populate the datatable rows
+      representedSiteList.map(item => {
+        if (item.dateDiff <= this.minDay) {
+          this.dataTable.row
+            .add([
+              '<a id="site-title" href="#">' + item.Title + "</a>",
+              "OK - using Franchise site",
+              item.storageUsed + " Gb"
+            ])
+            .draw(false);
+        }
+        if (item.dateDiff >= this.maxDay) {
+          this.dataTable.row
+            .add([
+              '<a id="site-title" href="#">' + item.Title + "</a>",
+              "Urgent - No activity at risk",
+              item.storageUsed + " Gb"
+            ])
+            .draw(false);
+        }
+        if (item.dateDiff > this.minDay && item.dateDiff < this.maxDay) {
+          this.dataTable.row
+            .add([
+              '<a id="site-title" href="#">' + item.Title + "</a>",
+              "Urgent - No activity at risk",
+              item.storageUsed + " Gb"
+            ])
+            .draw(false);
+        }
+        $("#site-title").attr("href", `${item.URL}`);
+      });
+
+      // Set all document items excluding folders to allFiles array
+      let documentItemsList = [];
+      let allFiles = [];
+      for (let a of configList) {
+        const webFranchise = Web(a.URL);
+
+        const documentItems = await webFranchise.lists
+          .getByTitle("Documents")
+          .items.get();
+
+        documentItemsList = [...documentItems].filter(
+          item => item.FileSystemObjectType !== 1
+        );
+        console.log("documentItemsList :>> ", documentItemsList);
+
+        for (let i = 0; i < documentItemsList.length; i++) {
+          allFiles.push(documentItemsList[i]);
+        }
+      }
+      console.log("allFiles :>> ", allFiles);
     }
   },
   mounted() {
     console.log("mounted...");
-
-    this.getTitle();
-
-    /*
-    const Url =
-      `${this.rootURL}/_api/web/GetFolderByServerRelativeUrl('/Shared%20Documents')`;
-
-    $.get(Url, function(data, status) {
-      console.log("data :>> ", data);
-    });
-
-    axios({
-      method: "get",
-      url: Url,
-      responseType: "stream"
-    }).then(function(response) {
-      console.log("response :>> ", response);
-    });
-    */
-
-    // Initialize the datatable - any is for preventing 'Property does not exist' error
-    // This is the solution reference - https://stackoverflow.com/questions/24984014/how-can-i-stop-property-does-not-exist-on-type-jquery-syntax-errors-when-using
-    ($("#sites-table") as any).DataTable();
+    // Initialize moment.js library
+    moment().format();
+    // Call getItems function
+    this.getItems();
   },
   created() {
     console.log("created...");
@@ -172,61 +258,9 @@ export default Vue.extend({
       tag.setAttribute("src", style);
       document.head.appendChild(tag);
     });
-  },
-  computed: {
-    fullName: {
-      get: function() {
-        return this.firstName + " " + this.lastName;
-      }
-    }
   }
 });
 </script>
-
-<!--
-<script lang="ts">
-import { Vue, Component, Prop } from "vue-property-decorator";
-
-/**
- * Component's properties
- */
-/*
-export interface ISimplyHelpingStatsProps {
-  description: string;
-}
-*/
-
-/**
- * Class-component
- */
-@Component
-export default class SimplyHelpingStats extends Vue {
-  // implements ISimplyHelpingStatsProps {
-  /**
-   * implementing ISimpleWebPartProps interface
-   */
-
-  @Prop() public description: string;
-  @Prop() private msg!: string;
-  firstName = 'Burak'
-  lastName = 'Seyhan'
-  counter = 0
-
-  mounted() {
-    console.log('This is mounted log');
-  }
-
-  get fullName() {
-    return this.firstName +  ' ' + this.lastName;
-  } 
-
-  incrementCounter() {
-    this.counter++;  
-  }
-
-}
-</script>
--->
 
 <style scoped>
 .container {
@@ -329,7 +363,7 @@ export default class SimplyHelpingStats extends Vue {
 }
 
 .stats-table {
-  margin: 20px 0 20px 15px;
+  margin: 30px 0 20px 15px;
 }
 
 .stats-table a {

@@ -10,8 +10,9 @@ export default class SimplyHelpingStatsWebPart extends BaseClientSideWebPart<
   ISimplyHelpingStatsWebPartProps
 > {
   public render(): void {
-    let userName = this.context.pageContext.user.displayName;
-    let rootURL = this.context.pageContext.web.absoluteUrl;
+    const userName = this.context.pageContext.user.displayName;
+    const rootURL = this.context.pageContext.web.absoluteUrl;
+    const header = "Simply Helping Franchise Sites Activity Report"
 
     const id: string = `wp-${this.instanceId}`;
     this.domElement.innerHTML = `<div id="${id}"></div>`;
@@ -22,6 +23,7 @@ export default class SimplyHelpingStatsWebPart extends BaseClientSideWebPart<
         h(SimplyHelpingStatsComponent, {
           props: {
             msg: "This message is coming from TS file",
+            header: header,
             description: this.properties.description,
             userName: userName,
             rootURL: rootURL

@@ -20,9 +20,10 @@
     "@microsoft/sp-property-pane": "1.11.0",
     "@microsoft/sp-webpart-base": "1.11.0",
     "@pnp/sp": "^2.0.8",
-    "axios": "^0.20.0",
     "datatables.net": "^1.10.21",
     "datatables.net-se": "^1.10.21",
+    "moment": "^2.27.0",
+    "moment-timezone": "^0.5.31",
     "vue": "^2.6.11",
     "vue-class-component": "^7.2.3",
     "vue-property-decorator": "^8.5.0"
