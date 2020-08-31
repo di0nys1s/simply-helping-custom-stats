@@ -64,7 +64,6 @@
 <script lang="ts">
 import Vue from "vue";
 import $ from "jquery";
-import axios from "axios";
 import moment from "moment-timezone";
 import "datatables.net";
 import "datatables.net-se";
@@ -72,6 +71,9 @@ import { sp } from "@pnp/sp";
 import { Web } from "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
+import "@pnp/sp/views";
+import "@pnp/sp/fields";
+import "@pnp/sp/files/web";
 
 export default Vue.extend({
   name: "Franchise Site Activity Report",
@@ -83,11 +85,7 @@ export default Vue.extend({
   data() {
     return {
       welcome: "Welcome to Simply Helping Site Stats",
-      counter: 0,
-      firstName: "Burak",
-      lastName: "Seyhan",
-      configList: [],
-      representedSiteList: [],
+      // representedSiteList: [],
       documentItemsList: [],
       headers: ["Franchise", "Status", "Storage Utilised"],
       numberOfActiveFranchiseSites: 0,
@@ -119,7 +117,7 @@ export default Vue.extend({
       const maxDay = this.maxDay;
 
       let franchiseSites = [...siteList].filter(a => {
-        let dateDifference = this.calculateDateDifference(a.Modified);
+        let dateDifference = this.calculateDateDifference(a.latestModified);
         if (siteStatus === "Active") return dateDifference <= minDay;
         if (siteStatus === "Inactive") return dateDifference >= maxDay;
         if (siteStatus === "Non-used")
@@ -128,52 +126,93 @@ export default Vue.extend({
       let numberFranchiseSites = franchiseSites.length;
       return numberFranchiseSites;
     },
+
     getItems: async function() {
-      const web = Web(`${this.rootURL}/sites/product-demos/franchise-hq-demo`);
+      const absoluteURL = this.rootURL;
+      const parentURLextension = "/sites/product-demos/franchise-hq-demo/";
+      const parentURL = absoluteURL + parentURLextension;
+      const franchiseStatsTitle = "Config - Franchise Stats";
+
+      const web = Web(`${parentURL}`);
       const configList = await web.lists
-        .getByTitle("Config - Franchise Stats")
+        .getByTitle(`${franchiseStatsTitle}`)
         .items.get();
 
-      console.log("List :>> ", configList);
-      this.configList = [...configList];
+      console.log("configList :>> ", configList);
 
       let siteList = {
         Title: "",
         URL: "",
+        latestModified: [],
         dateDiff: "",
+        documents: {},
         storageUsed: 0
       };
-      let representedSiteList = [];
 
+      let representedSiteList = [];
+      let latestModifiedDocDate = [];
       // Set necessary table values to a new representedSiteList array
-      [...configList].map(c => {
+      for (let c of [...configList]) {
+        const web2 = Web(`${c.URL}`);
+        const siteDocumentList = await web2.lists
+          .getByTitle("Documents")
+          .items.get();
+
+        const field = await web2.lists
+          .getByTitle("Documents")
+          .fields.getByInternalNameOrTitle("File Size")();
+
+        console.log("field :>> ", field);
+
+        const result2 = await web2.lists
+          .getByTitle("Documents")
+          .views.getByTitle("Test View")
+          .fields.get();
+
+        console.log("result2 :>> ", result2);
+
+        // FileSystemObjectType === 1 ? Document is Folder : Document is File
+        const documentItemsList = [...siteDocumentList].filter(
+          item => item.FileSystemObjectType !== 1
+        );
+
+        // console.log("documentItemsList :>> ", documentItemsList);
+
+        // Get all the documents list of the particular site
+        // Sort them my Modified date
+        // Get the first item in the array which gives the latest modified doc
+        latestModifiedDocDate = documentItemsList
+          .map(s => s.Modified)
+          .sort((a, b) => b.Modifed - a.Modified)[0];
+
+        // Fill the siteList object with necessary site data
         siteList.Title = c.Title;
         siteList.URL = c.URL;
-        siteList.dateDiff = this.calculateDateDifference(c.Modified);
-        console.log(
-          "this.calculateDateDifference(c.Modified):>> ",
-          this.calculateDateDifference(c.Modified)
-        );
+        siteList.latestModified = latestModifiedDocDate;
+        siteList.dateDiff = this.calculateDateDifference(latestModifiedDocDate);
+        siteList.documents = documentItemsList;
+
+        // Fill the representedSiteList array with all the site objects
         representedSiteList.push({ ...siteList });
-      });
-      console.log("this.siteList :>> ", representedSiteList);
+      }
+      console.log("representedSiteList :>> ", representedSiteList);
 
       // This is for vue table - not used
-      this.representedSiteList = representedSiteList;
+      // this.representedSiteList = representedSiteList;
 
       // Set number of active Franchise Sites
       this.numberOfActiveFranchiseSites = this.calculateNumberOfFranchiseSites(
-        configList,
+        representedSiteList,
         "Active"
       );
       // Set number of inactive Franchise Sites
       this.numberOfInactiveFranchiseSites = this.calculateNumberOfFranchiseSites(
-        configList,
+        representedSiteList,
         "Inactive"
       );
       // Set number of non-used Last 30 days Franchise Sites
       this.numberOfNonUsedLast30DaysFranchiseSites = this.calculateNumberOfFranchiseSites(
-        configList,
+        representedSiteList,
         "Non-used"
       );
 
@@ -186,7 +225,7 @@ export default Vue.extend({
           this.dataTable.row
             .add([
               '<a id="site-title" href="#">' + item.Title + "</a>",
-              "OK - using Franchise site",
+              `OK! Using site documents in the last ${this.minDay} days`,
               item.storageUsed + " Gb"
             ])
             .draw(false);
@@ -195,7 +234,7 @@ export default Vue.extend({
           this.dataTable.row
             .add([
               '<a id="site-title" href="#">' + item.Title + "</a>",
-              "Urgent - No activity at risk",
+              `Urgent! No site documents activity detected in the last ${this.maxDay} days`,
               item.storageUsed + " Gb"
             ])
             .draw(false);
@@ -204,45 +243,24 @@ export default Vue.extend({
           this.dataTable.row
             .add([
               '<a id="site-title" href="#">' + item.Title + "</a>",
-              "Urgent - No activity at risk",
+              `Warning! Non-use of site documents in the last ${item.dateDiff} days`,
               item.storageUsed + " Gb"
             ])
             .draw(false);
         }
         $("#site-title").attr("href", `${item.URL}`);
       });
-
-      // Set all document items excluding folders to allFiles array
-      let documentItemsList = [];
-      let allFiles = [];
-      for (let a of configList) {
-        const webFranchise = Web(a.URL);
-
-        const documentItems = await webFranchise.lists
-          .getByTitle("Documents")
-          .items.get();
-
-        documentItemsList = [...documentItems].filter(
-          item => item.FileSystemObjectType !== 1
-        );
-        console.log("documentItemsList :>> ", documentItemsList);
-
-        for (let i = 0; i < documentItemsList.length; i++) {
-          allFiles.push(documentItemsList[i]);
-        }
-      }
-      console.log("allFiles :>> ", allFiles);
     }
   },
   mounted() {
-    console.log("mounted...");
+    console.log("Mounted...");
     // Initialize moment.js library
     moment().format();
     // Call getItems function
     this.getItems();
   },
   created() {
-    console.log("created...");
+    console.log("Created...");
 
     var styles = [
       "https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css",
