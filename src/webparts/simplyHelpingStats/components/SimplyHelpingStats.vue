@@ -27,7 +27,7 @@
     <div class="table-responsive stats-table">
       <table
         id="sites-table"
-        class="ui celled table display"
+        class="ui celled table display nowrap"
         style="width: 100%"
       >
         <thead>
@@ -92,7 +92,7 @@ export default Vue.extend({
       numberOfInactiveFranchiseSites: 0,
       numberOfNonUsedLast30DaysFranchiseSites: 0,
       minDay: 2,
-      maxDay: 4,
+      maxDay: 5,
       totalGbUsed: 0,
       dataTable: null
     };
@@ -111,7 +111,6 @@ export default Vue.extend({
       );
       return dateDifference;
     },
-
     calculateNumberOfFranchiseSites: function(siteList, siteStatus) {
       const minDay = this.minDay;
       const maxDay = this.maxDay;
@@ -126,7 +125,6 @@ export default Vue.extend({
       let numberFranchiseSites = franchiseSites.length;
       return numberFranchiseSites;
     },
-
     getItems: async function() {
       const absoluteURL = this.rootURL;
       const parentURLextension = "/sites/product-demos/franchise-hq-demo/";
@@ -179,8 +177,6 @@ export default Vue.extend({
           item => item.FileSystemObjectType !== 1
         );
 
-        // console.log("documentItemsList :>> ", documentItemsList);
-
         // Get all the documents list of the particular site
         // Sort them my Modified date
         // Get the first item in the array which gives the latest modified doc
@@ -196,7 +192,7 @@ export default Vue.extend({
           latestModifiedDocDate == undefined ? "No Document" : "Document exist";
         siteList.dateDiff =
           latestModifiedDocDate == undefined
-            ? 90
+            ? this.maxDay + 1
             : this.calculateDateDifference(latestModifiedDocDate);
         siteList.documents = documentItemsList;
 
@@ -229,44 +225,57 @@ export default Vue.extend({
       this.dataTable = ($("#sites-table") as any).DataTable();
       // Populate the datatable rows
       representedSiteList.map(item => {
-        if (item.dateDiff <= this.minDay) {
+        if (item.documentStatus === "No Document") {
           this.dataTable.row
             .add([
-              '<a id="site-title" href="#">' + item.Title + "</a>",
-              `OK! Using site documents in the last ${this.minDay} days`,
-              item.storageUsed + " Gb"
-            ])
-            .draw(false);
-        }
-        if (item.dateDiff >= this.maxDay && item.documentStatus === "No Document") {
-          this.dataTable.row
-            .add([
-              '<a id="site-title" href="#">' + item.Title + "</a>",
+              `<a id="site-title" href=${item.URL} target="_blank">` +
+                item.Title +
+                "</a>",
               `Attention! There is no document in the site`,
               item.storageUsed + " Gb"
             ])
             .draw(false);
+        } else {
+          if (item.dateDiff <= this.minDay) {
+            this.dataTable.row
+              .add([
+                `<a id="site-title" href=${item.URL} target="_blank">` +
+                  item.Title +
+                  "</a>",
+                `OK! Using site documents in the last ${this.minDay} days`,
+                item.storageUsed + " Gb"
+              ])
+              .draw(false);
+          }
+          if (item.dateDiff >= this.maxDay) {
+            this.dataTable.row
+              .add([
+                `<a id="site-title" href=${item.URL} target="_blank">` +
+                  item.Title +
+                  "</a>",
+                `Urgent! No site documents activity detected in the last ${this.maxDay} days`,
+                item.storageUsed + " Gb"
+              ])
+              .draw(false);
+          }
+          if (item.dateDiff > this.minDay && item.dateDiff < this.maxDay) {
+            this.dataTable.row
+              .add([
+                `<a id="site-title" href=${item.URL} target="_blank">` +
+                  item.Title +
+                  "</a>",
+                `Warning! Non-use of site documents in the last ${item.dateDiff} days`,
+                item.storageUsed + " Gb"
+              ])
+              .draw(false);
+          }
         }
-        if (item.dateDiff >= this.maxDay && item.documentStatus === "Document exist") {
-          this.dataTable.row
-            .add([
-              '<a id="site-title" href="#">' + item.Title + "</a>",
-              `Urgent! No site documents activity detected in the last ${this.maxDay} days`,
-              item.storageUsed + " Gb"
-            ])
-            .draw(false);
-        }
-        if (item.dateDiff > this.minDay && item.dateDiff < this.maxDay) {
-          this.dataTable.row
-            .add([
-              '<a id="site-title" href="#">' + item.Title + "</a>",
-              `Warning! Non-use of site documents in the last ${item.dateDiff} days`,
-              item.storageUsed + " Gb"
-            ])
-            .draw(false);
-        }
-        $("#site-title").attr("href", `${item.URL}`);
       });
+
+      // table rows responsiveness adjustment for mobile devices
+      if ($("#sites-table").css("width") <= "500px") {
+        $("#sites-table").removeClass("nowrap");
+      }
     }
   },
   mounted() {
