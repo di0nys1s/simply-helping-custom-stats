@@ -117,7 +117,7 @@ export default Vue.extend({
       const maxDay = this.maxDay;
 
       let franchiseSites = [...siteList].filter(a => {
-        let dateDifference = this.calculateDateDifference(a.latestModified);
+        let dateDifference = a.dateDiff;
         if (siteStatus === "Active") return dateDifference <= minDay;
         if (siteStatus === "Inactive") return dateDifference >= maxDay;
         if (siteStatus === "Non-used")
@@ -146,6 +146,7 @@ export default Vue.extend({
         latestModified: [],
         dateDiff: "",
         documents: {},
+        documentStatus: "",
         storageUsed: 0
       };
 
@@ -158,6 +159,7 @@ export default Vue.extend({
           .getByTitle("Documents")
           .items.get();
 
+        /*
         const field = await web2.lists
           .getByTitle("Documents")
           .fields.getByInternalNameOrTitle("File Size")();
@@ -170,6 +172,7 @@ export default Vue.extend({
           .fields.get();
 
         console.log("result2 :>> ", result2);
+        */
 
         // FileSystemObjectType === 1 ? Document is Folder : Document is File
         const documentItemsList = [...siteDocumentList].filter(
@@ -189,7 +192,12 @@ export default Vue.extend({
         siteList.Title = c.Title;
         siteList.URL = c.URL;
         siteList.latestModified = latestModifiedDocDate;
-        siteList.dateDiff = this.calculateDateDifference(latestModifiedDocDate);
+        siteList.documentStatus =
+          latestModifiedDocDate == undefined ? "No Document" : "Document exist";
+        siteList.dateDiff =
+          latestModifiedDocDate == undefined
+            ? 90
+            : this.calculateDateDifference(latestModifiedDocDate);
         siteList.documents = documentItemsList;
 
         // Fill the representedSiteList array with all the site objects
@@ -230,7 +238,16 @@ export default Vue.extend({
             ])
             .draw(false);
         }
-        if (item.dateDiff >= this.maxDay) {
+        if (item.dateDiff >= this.maxDay && item.documentStatus === "No Document") {
+          this.dataTable.row
+            .add([
+              '<a id="site-title" href="#">' + item.Title + "</a>",
+              `Attention! There is no document in the site`,
+              item.storageUsed + " Gb"
+            ])
+            .draw(false);
+        }
+        if (item.dateDiff >= this.maxDay && item.documentStatus === "Document exist") {
           this.dataTable.row
             .add([
               '<a id="site-title" href="#">' + item.Title + "</a>",
