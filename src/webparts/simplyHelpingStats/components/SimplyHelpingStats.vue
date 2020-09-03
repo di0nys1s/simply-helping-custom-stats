@@ -17,7 +17,7 @@
       </div>
       <div class="box box-4">
         <div class="storage-info-container">
-          <h1>{{ totalGbUsed }}</h1>
+          <h1>{{ totalStorageUtilised }}</h1>
           <span id="gb-used">Gb used</span>
         </div>
         <p>Franchise storage utilised</p>
@@ -37,25 +37,7 @@
             </th>
           </tr>
         </thead>
-        <tbody>
-          <!--
-          <tr v-for="item in representedSiteList" :key="item.id">
-            <td>
-              <a :href="item.URL">{{ item.Title }}</a>
-            </td>
-            <td v-if="item.dateDiff <= minDay">
-              OK - using Franchise site
-            </td>
-            <td v-else-if="item.dateDiff >= maxDay">
-              Urgent - No activity at risk
-            </td>
-            <td v-else-if="item.dateDiff > minDay && item.dateDiff < maxDay">
-              Needs attention, inactive last {{ item.dateDiff }} days
-            </td>
-            <td>{{ item.storageUsed }} Gb</td>
-          </tr>
-          -->
-        </tbody>
+        <tbody></tbody>
       </table>
     </div>
   </div>
@@ -63,8 +45,9 @@
 
 <script lang="ts">
 import Vue from "vue";
-import $ from "jquery";
+import $, { data } from "jquery";
 import moment from "moment-timezone";
+import axios from "axios";
 import "datatables.net";
 import "datatables.net-se";
 import { sp } from "@pnp/sp";
@@ -85,16 +68,15 @@ export default Vue.extend({
   data() {
     return {
       welcome: "Welcome to Simply Helping Site Stats",
-      // representedSiteList: [],
       documentItemsList: [],
       headers: ["Franchise", "Status", "Storage Utilised"],
       numberOfActiveFranchiseSites: 0,
       numberOfInactiveFranchiseSites: 0,
       numberOfNonUsedLast30DaysFranchiseSites: 0,
-      minDay: 2,
-      maxDay: 5,
-      totalGbUsed: 0,
-      dataTable: null
+      minDay: 30,
+      maxDay: 60,
+      dataTable: null,
+      totalStorageUtilised: 0
     };
   },
   methods: {
@@ -102,6 +84,13 @@ export default Vue.extend({
       let today = new Date().toUTCString();
       let formattedToday = moment(today);
       return formattedToday;
+    },
+    formatTitleToUrlTitle: function(title) {
+      const urlTitle = title
+        .split(" ")
+        .join("-")
+        .toLowerCase();
+      return urlTitle;
     },
     calculateDateDifference: function(modifiedDate) {
       let franchiseSiteUpdatedDate = moment(modifiedDate);
@@ -125,11 +114,21 @@ export default Vue.extend({
       let numberFranchiseSites = franchiseSites.length;
       return numberFranchiseSites;
     },
+    calculateStorage: function(item, itemIndex, size) {
+      item.storageUsed[itemIndex] =
+        parseFloat(item.storageUsed[itemIndex]) / size;
+      item.storageUsed[itemIndex] = (
+        Math.round(item.storageUsed[itemIndex] * 100) / 100
+      ).toFixed(2);
+      return item.storageUsed[itemIndex];
+    },
     getItems: async function() {
       const absoluteURL = this.rootURL;
       const parentURLextension = "/sites/product-demos/franchise-hq-demo/";
       const parentURL = absoluteURL + parentURLextension;
       const franchiseStatsTitle = "Config - Franchise Stats";
+      const billion = 1000000000;
+      const million = 1000000;
 
       const web = Web(`${parentURL}`);
       const configList = await web.lists
@@ -145,11 +144,13 @@ export default Vue.extend({
         dateDiff: "",
         documents: {},
         documentStatus: "",
-        storageUsed: 0
+        storageUsed: [],
+        siteStorageUsedIndex: 0
       };
 
       let representedSiteList = [];
       let latestModifiedDocDate = [];
+      let storageUtilised = 0;
       // Set necessary table values to a new representedSiteList array
       for (let c of [...configList]) {
         const web2 = Web(`${c.URL}`);
@@ -157,32 +158,36 @@ export default Vue.extend({
           .getByTitle("Documents")
           .items.get();
 
-        /*
-        const field = await web2.lists
-          .getByTitle("Documents")
-          .fields.getByInternalNameOrTitle("File Size")();
-
-        console.log("field :>> ", field);
-
-        const result2 = await web2.lists
-          .getByTitle("Documents")
-          .views.getByTitle("Test View")
-          .fields.get();
-
-        console.log("result2 :>> ", result2);
-        */
-
         // FileSystemObjectType === 1 ? Document is Folder : Document is File
         const documentItemsList = [...siteDocumentList].filter(
           item => item.FileSystemObjectType !== 1
         );
 
         // Get all the documents list of the particular site
-        // Sort them my Modified date
-        // Get the first item in the array which gives the latest modified doc
-        latestModifiedDocDate = documentItemsList
-          .map(s => s.Modified)
-          .sort((a, b) => b.Modifed - a.Modified)[0];
+        // Get the last item in the array which gives the latest modified doc
+        latestModifiedDocDate = documentItemsList.map(s => s.Modified)[
+          documentItemsList.length - 1
+        ];
+
+        const formattedTitle = this.formatTitleToUrlTitle(c.Title);
+        try {
+          await $.ajax({
+            url: `${parentURL +
+              formattedTitle}/_api/web/getFolderByServerRelativeUrl(%27Shared%20Documents%27)?$select=StorageMetrics&$expand=StorageMetrics`,
+            type: "GET",
+            async: true,
+            dataType: "json",
+            success: function(res) {
+              console.log("res :>> ", res.StorageMetrics.TotalFileStreamSize);
+              const fileSize = parseInt(res.StorageMetrics.TotalFileStreamSize);
+              storageUtilised = fileSize;
+            }
+          });
+        } catch (error) {
+          console.error(error);
+        }
+
+        console.log("storageUtilised :>> ", storageUtilised);
 
         // Fill the siteList object with necessary site data
         siteList.Title = c.Title;
@@ -195,14 +200,23 @@ export default Vue.extend({
             ? this.maxDay + 1
             : this.calculateDateDifference(latestModifiedDocDate);
         siteList.documents = documentItemsList;
+        siteList.storageUsed.push(storageUtilised);
 
         // Fill the representedSiteList array with all the site objects
         representedSiteList.push({ ...siteList });
       }
+      console.log("siteList.storageUsed :>> ", siteList.storageUsed);
       console.log("representedSiteList :>> ", representedSiteList);
 
-      // This is for vue table - not used
-      // this.representedSiteList = representedSiteList;
+      this.totalStorageUtilised = siteList.storageUsed.reduce(
+        (a, b) => a + b,
+        0
+      );
+      this.totalStorageUtilised =
+        parseFloat(this.totalStorageUtilised) / billion;
+      this.totalStorageUtilised = (
+        Math.round(this.totalStorageUtilised * 100) / 100
+      ).toFixed(2);
 
       // Set number of active Franchise Sites
       this.numberOfActiveFranchiseSites = this.calculateNumberOfFranchiseSites(
@@ -225,6 +239,8 @@ export default Vue.extend({
       this.dataTable = ($("#sites-table") as any).DataTable();
       // Populate the datatable rows
       representedSiteList.map(item => {
+        console.log("index", representedSiteList.indexOf(item));
+        let itemIndex = representedSiteList.indexOf(item);
         if (item.documentStatus === "No Document") {
           this.dataTable.row
             .add([
@@ -232,7 +248,7 @@ export default Vue.extend({
                 item.Title +
                 "</a>",
               `Attention! There is no document in the site`,
-              item.storageUsed + " Gb"
+              this.calculateStorage(item, itemIndex, million) + " Mb"
             ])
             .draw(false);
         } else {
@@ -243,7 +259,7 @@ export default Vue.extend({
                   item.Title +
                   "</a>",
                 `OK! Using site documents in the last ${this.minDay} days`,
-                item.storageUsed + " Gb"
+                this.calculateStorage(item, itemIndex, million) + " Mb"
               ])
               .draw(false);
           }
@@ -254,7 +270,7 @@ export default Vue.extend({
                   item.Title +
                   "</a>",
                 `Urgent! No site documents activity detected in the last ${this.maxDay} days`,
-                item.storageUsed + " Gb"
+                this.calculateStorage(item, itemIndex, million) + " Mb"
               ])
               .draw(false);
           }
@@ -265,7 +281,7 @@ export default Vue.extend({
                   item.Title +
                   "</a>",
                 `Warning! Non-use of site documents in the last ${item.dateDiff} days`,
-                item.storageUsed + " Gb"
+                this.calculateStorage(item, itemIndex, million) + " Mb"
               ])
               .draw(false);
           }
