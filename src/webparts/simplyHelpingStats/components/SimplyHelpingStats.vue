@@ -124,7 +124,8 @@ export default Vue.extend({
     },
     getItems: async function() {
       const absoluteURL = this.rootURL;
-      const parentURLextension = "/sites/product-demos/franchise-hq-demo/";
+      // const parentURLextension = "/sites/product-demos/franchise-hq-demo/";
+      const parentURLextension = "/";
       const parentURL = absoluteURL + parentURLextension;
       const franchiseStatsTitle = "Config - Franchise Stats";
       const billion = 1000000000;
