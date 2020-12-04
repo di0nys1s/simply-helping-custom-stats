@@ -12,7 +12,7 @@ export default class SimplyHelpingStatsWebPart extends BaseClientSideWebPart<
   public render(): void {
     const userName = this.context.pageContext.user.displayName;
     const rootURL = this.context.pageContext.web.absoluteUrl;
-    const header = "Simply Helping Franchise Sites Activity Report"
+    const header = "Simply Helping Franchise Sites Activity Report";
 
     const id: string = `wp-${this.instanceId}`;
     this.domElement.innerHTML = `<div id="${id}"></div>`;
