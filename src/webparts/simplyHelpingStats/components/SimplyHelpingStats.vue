@@ -85,11 +85,31 @@ export default Vue.extend({
       let formattedToday = moment(today);
       return formattedToday;
     },
+    /*
     formatTitleToUrlTitle: function(title) {
       const urlTitle = title
         .split(" ")
         .join("-")
         .toLowerCase();
+      return urlTitle;
+    },
+    */
+    formatTitleToSimplyHelpingCustomUrlTitle: function(title) {
+      const splittedTitle = title.split("-");
+      
+      let titleArray = [];
+      for(let i = 0; i < splittedTitle.length; i++) {
+        if(splittedTitle.length === 1) {
+          titleArray.push(splittedTitle[i].substring(0, 3).toUpperCase());
+        } else {
+          titleArray.push(splittedTitle[i].charAt(0));
+        }
+      }
+
+      const reducer = (accumulator, currentValue) => accumulator + currentValue;
+      let urlTitle = titleArray.reduce(reducer) + 'HomePage'
+      // console.log('urlTitle :>> ', urlTitle);
+      
       return urlTitle;
     },
     calculateDateDifference: function(modifiedDate) {
@@ -114,19 +134,24 @@ export default Vue.extend({
       let numberFranchiseSites = franchiseSites.length;
       return numberFranchiseSites;
     },
-    calculateStorage: function(item, itemIndex, size) {
-      item.storageUsed[itemIndex] =
-        parseFloat(item.storageUsed[itemIndex]) / size;
-      item.storageUsed[itemIndex] = (
-        Math.round(item.storageUsed[itemIndex] * 100) / 100
+    calculateStorage: function(item, size) {
+      item.storageUtilised =
+        parseFloat(item.storageUtilised) / size;
+      item.storageUtilised = (
+        Math.round(item.storageUtilised * 100) / 100
       ).toFixed(2);
-      return item.storageUsed[itemIndex];
+      return item.storageUtilised;
     },
     getItems: async function() {
+      
+      /*
       const absoluteURL = this.rootURL;
-      // const parentURLextension = "/sites/product-demos/franchise-hq-demo/";
+      const parentURLextension = "/sites/product-demos/franchise-hq-demo/";
       const parentURLextension = "/";
       const parentURL = absoluteURL + parentURLextension;
+      */
+      const parentURL = 'https://simplyhelpingcomau.sharepoint.com/sites/HeadOfficeHub'
+      const parentURLSub = 'https://simplyhelpingcomau.sharepoint.com/sites/'
       const franchiseStatsTitle = "Config - Franchise Stats";
       const billion = 1000000000;
       const million = 1000000;
@@ -146,7 +171,8 @@ export default Vue.extend({
         documents: {},
         documentStatus: "",
         storageUsed: [],
-        siteStorageUsedIndex: 0
+        storageUtilised: 0,
+        siteStorageUsedIndex: 0,
       };
 
       let representedSiteList = [];
@@ -159,27 +185,35 @@ export default Vue.extend({
           .getByTitle("Documents")
           .items.get();
 
+
+        console.log('Title => ', c.Title);
+        console.log('siteDocumentList.length :>> ', siteDocumentList.length);
+
         // FileSystemObjectType === 1 ? Document is Folder : Document is File
         const documentItemsList = [...siteDocumentList].filter(
           item => item.FileSystemObjectType !== 1
         );
 
+        // console.log('mySiteDocumentList :>> ', siteDocumentList.map(item => item.FileSystemObjectType));
+
         // Get all the documents list of the particular site
         // Get the last item in the array which gives the latest modified doc
-        latestModifiedDocDate = documentItemsList.map(s => s.Modified)[
-          documentItemsList.length - 1
-        ];
+        latestModifiedDocDate = documentItemsList.map(s => s.Modified).pop()
 
-        const formattedTitle = this.formatTitleToUrlTitle(c.Title);
+        // console.log('di0nys1s789 :>> ', documentItemsList);
+
+        const formattedTitle = this.formatTitleToSimplyHelpingCustomUrlTitle(c.Title);
+        const documentURL = `${parentURLSub + formattedTitle}/_api/web/getFolderByServerRelativeUrl(%27Shared%20Documents%27)?$select=StorageMetrics&$expand=StorageMetrics`;
+        // console.log('documentURL :>> ', documentURL);
+
         try {
           await $.ajax({
-            url: `${parentURL +
-              formattedTitle}/_api/web/getFolderByServerRelativeUrl(%27Shared%20Documents%27)?$select=StorageMetrics&$expand=StorageMetrics`,
+            url: documentURL,
             type: "GET",
             async: true,
             dataType: "json",
             success: function(res) {
-              console.log("res :>> ", res.StorageMetrics.TotalFileStreamSize);
+              // console.log("res :>> ", res.StorageMetrics.TotalFileStreamSize);
               const fileSize = parseInt(res.StorageMetrics.TotalFileStreamSize);
               storageUtilised = fileSize;
             }
@@ -201,13 +235,14 @@ export default Vue.extend({
             ? this.maxDay + 1
             : this.calculateDateDifference(latestModifiedDocDate);
         siteList.documents = documentItemsList;
+        siteList.storageUtilised = storageUtilised;
         siteList.storageUsed.push(storageUtilised);
 
         // Fill the representedSiteList array with all the site objects
         representedSiteList.push({ ...siteList });
       }
-      console.log("siteList.storageUsed :>> ", siteList.storageUsed);
-      console.log("representedSiteList :>> ", representedSiteList);
+      // console.log("siteList.storageUsed :>> ", siteList.storageUsed);
+      // console.log("representedSiteList :>> ", representedSiteList);
 
       this.totalStorageUtilised = siteList.storageUsed.reduce(
         (a, b) => a + b,
@@ -238,18 +273,18 @@ export default Vue.extend({
       // Initialize the datatable - any is for preventing 'Property does not exist' error
       // This is the solution reference - https://stackoverflow.com/questions/24984014/how-can-i-stop-property-does-not-exist-on-type-jquery-syntax-errors-when-using
       this.dataTable = ($("#sites-table") as any).DataTable();
+      console.log("index", representedSiteList);
       // Populate the datatable rows
       representedSiteList.map(item => {
-        console.log("index", representedSiteList.indexOf(item));
         let itemIndex = representedSiteList.indexOf(item);
-        if (item.documentStatus === "No Document") {
+        if (item.documentStatus === "No Document" && item.storageUtilised === 0) {
           this.dataTable.row
             .add([
               `<a id="site-title" href=${item.URL} target="_blank">` +
                 item.Title +
                 "</a>",
               `Attention! There is no document in the site`,
-              this.calculateStorage(item, itemIndex, million) + " Mb"
+              this.calculateStorage(item, million) + " Mb"
             ])
             .draw(false);
         } else {
@@ -260,7 +295,7 @@ export default Vue.extend({
                   item.Title +
                   "</a>",
                 `OK! Using site documents in the last ${this.minDay} days`,
-                this.calculateStorage(item, itemIndex, million) + " Mb"
+                this.calculateStorage(item, million) + " Mb"
               ])
               .draw(false);
           }
@@ -271,7 +306,7 @@ export default Vue.extend({
                   item.Title +
                   "</a>",
                 `Urgent! No site documents activity detected in the last ${this.maxDay} days`,
-                this.calculateStorage(item, itemIndex, million) + " Mb"
+                this.calculateStorage(item, million) + " Mb"
               ])
               .draw(false);
           }
@@ -282,7 +317,7 @@ export default Vue.extend({
                   item.Title +
                   "</a>",
                 `Warning! Non-use of site documents in the last ${item.dateDiff} days`,
-                this.calculateStorage(item, itemIndex, million) + " Mb"
+                this.calculateStorage(item, million) + " Mb"
               ])
               .draw(false);
           }
@@ -301,6 +336,9 @@ export default Vue.extend({
     moment().format();
     // Call getItems function
     this.getItems();
+
+
+
   },
   created() {
     console.log("Created...");
