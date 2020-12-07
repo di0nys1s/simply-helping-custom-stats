@@ -93,7 +93,7 @@ export default Vue.extend({
         .toLowerCase();
       return urlTitle;
     },
-    */
+    
     formatTitleToSimplyHelpingCustomUrlTitle: function(title) {
       const splittedTitle = title.split("-");
       
@@ -112,6 +112,7 @@ export default Vue.extend({
       
       return urlTitle;
     },
+    */
     calculateDateDifference: function(modifiedDate) {
       let franchiseSiteUpdatedDate = moment(modifiedDate);
       let dateDifference = this.formattedToday().diff(
@@ -151,7 +152,6 @@ export default Vue.extend({
       const parentURL = absoluteURL + parentURLextension;
       */
       const parentURL = 'https://simplyhelpingcomau.sharepoint.com/sites/HeadOfficeHub'
-      const parentURLSub = 'https://simplyhelpingcomau.sharepoint.com/sites/'
       const franchiseStatsTitle = "Config - Franchise Stats";
       const billion = 1000000000;
       const million = 1000000;
@@ -161,7 +161,7 @@ export default Vue.extend({
         .getByTitle(`${franchiseStatsTitle}`)
         .items.get();
 
-      console.log("configList :>> ", configList);
+      console.log("configListss :>> ", configList);
 
       let siteList = {
         Title: "",
@@ -178,33 +178,111 @@ export default Vue.extend({
       let representedSiteList = [];
       let latestModifiedDocDate = [];
       let storageUtilised = 0;
+      
       // Set necessary table values to a new representedSiteList array
       for (let c of [...configList]) {
         const web2 = Web(`${c.URL}`);
+        
+        /*
         const siteDocumentList = await web2.lists
           .getByTitle("Documents")
           .items.get();
+        */
 
+        const documentRest1 = `${c.URL}/_api/web/lists/getbytitle('Documents')/items?$top=5000`;
+        const documentRest2 = `${c.URL}/_api/web/lists/getbytitle('Documents')/items?$skiptoken=Paged=TRUE%26p_ID=5001&$top=5000`;
+        const documentRest3 = `${c.URL}/_api/web/lists/getbytitle('Documents')/items?$skiptoken=Paged=TRUE%26p_ID=10001&$top=5000`;
+        const documentRest4 = `${c.URL}/_api/web/lists/getbytitle('Documents')/items?$skiptoken=Paged=TRUE%26p_ID=15001&$top=5000`;
+        
+        console.log('c.URL :>> ', c.URL);
 
-        console.log('Title => ', c.Title);
-        console.log('siteDocumentList.length :>> ', siteDocumentList.length);
+        let accumulatedDocumentList = [];
+        try {
+          await $.ajax({
+            url: documentRest1,
+            type: "GET",
+            async: true,
+            dataType: "json",
+            success: function(res) {
+              // console.log("res :>> ", res.StorageMetrics.TotalFileStreamSize);
+              console.log('res.value :>> ', res.value);
+              const currentDocumentList = res.value;
+              accumulatedDocumentList.push(currentDocumentList)
+            }
+          });
+        } catch (error) {
+          console.error(error);
+        }
+
+        try {
+          await $.ajax({
+            url: documentRest2,
+            type: "GET",
+            async: true,
+            dataType: "json",
+            success: function(res) {
+              // console.log("res :>> ", res.StorageMetrics.TotalFileStreamSize);
+              console.log('res.value2 :>> ', res.value);
+              const currentDocumentList2 = res.value;
+
+              accumulatedDocumentList.push(currentDocumentList2);
+            }
+          });
+        } catch (error) {
+          console.error(error);
+        }
+
+        try {
+          await $.ajax({
+            url: documentRest3,
+            type: "GET",
+            async: true,
+            dataType: "json",
+            success: function(res) {
+              // console.log("res :>> ", res.StorageMetrics.TotalFileStreamSize);
+              console.log('res.value3 :>> ', res.value);
+              const currentDocumentList3 = res.value;
+
+              accumulatedDocumentList.push(currentDocumentList3);
+            }
+          });
+        } catch (error) {
+          console.error(error);
+        }
+
+        try {
+          await $.ajax({
+            url: documentRest4,
+            type: "GET",
+            async: true,
+            dataType: "json",
+            success: function(res) {
+              // console.log("res :>> ", res.StorageMetrics.TotalFileStreamSize);
+              console.log('res.value4 :>> ', res.value);
+              const currentDocumentList4 = res.value;
+
+              accumulatedDocumentList.push(currentDocumentList4);
+            }
+          });
+        } catch (error) {
+          console.error(error);
+        }
+
+        console.log('accumulatedDocumentList123 :>> ', [...accumulatedDocumentList[0], ...accumulatedDocumentList[1], ...accumulatedDocumentList[2], ...accumulatedDocumentList[3]]);
+
+        const siteDocumentList = [...accumulatedDocumentList[0], ...accumulatedDocumentList[1], ...accumulatedDocumentList[2], ...accumulatedDocumentList[3]];
+
 
         // FileSystemObjectType === 1 ? Document is Folder : Document is File
         const documentItemsList = [...siteDocumentList].filter(
           item => item.FileSystemObjectType !== 1
         );
 
-        // console.log('mySiteDocumentList :>> ', siteDocumentList.map(item => item.FileSystemObjectType));
-
         // Get all the documents list of the particular site
         // Get the last item in the array which gives the latest modified doc
         latestModifiedDocDate = documentItemsList.map(s => s.Modified).pop()
 
-        // console.log('di0nys1s789 :>> ', documentItemsList);
-
-        const formattedTitle = this.formatTitleToSimplyHelpingCustomUrlTitle(c.Title);
-        const documentURL = `${parentURLSub + formattedTitle}/_api/web/getFolderByServerRelativeUrl(%27Shared%20Documents%27)?$select=StorageMetrics&$expand=StorageMetrics`;
-        // console.log('documentURL :>> ', documentURL);
+        const documentURL = `${c.URL}/_api/web/getFolderByServerRelativeUrl(%27Shared%20Documents%27)?$select=StorageMetrics&$expand=StorageMetrics`;
 
         try {
           await $.ajax({
@@ -213,7 +291,6 @@ export default Vue.extend({
             async: true,
             dataType: "json",
             success: function(res) {
-              // console.log("res :>> ", res.StorageMetrics.TotalFileStreamSize);
               const fileSize = parseInt(res.StorageMetrics.TotalFileStreamSize);
               storageUtilised = fileSize;
             }
@@ -241,8 +318,6 @@ export default Vue.extend({
         // Fill the representedSiteList array with all the site objects
         representedSiteList.push({ ...siteList });
       }
-      // console.log("siteList.storageUsed :>> ", siteList.storageUsed);
-      // console.log("representedSiteList :>> ", representedSiteList);
 
       this.totalStorageUtilised = siteList.storageUsed.reduce(
         (a, b) => a + b,
